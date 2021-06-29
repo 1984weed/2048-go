@@ -13,8 +13,8 @@ import (
 	"strconv"
 )
 
-const GAME_WIDTH = 80
-const GAME_HEIGHT = 40
+// const game_width int = 40 / 2
+// const game_height int = 40 / 2
 const GAME_TOP_OFFSET = 1
 
 type Tile struct {
@@ -62,7 +62,7 @@ func tbprint(x, y int, fg, bg termbox.Attribute, msg string) {
 	}
 }
 
-func drawSell(tile Tile, left int, top int, cellWidth int, cellHeight int) {
+func drawCell(tile Tile, left int, top int, cellWidth int, cellHeight int) {
 	const coldef = termbox.ColorDefault
 
 	defaultColorFill(left, top, cellWidth, 1, termbox.Cell{Ch: '─'})
@@ -81,6 +81,8 @@ func handleKeyEvent() {
 		case termbox.EventKey:
 			switch ev.Key {
 			case termbox.KeyEsc:
+				return
+			case termbox.KeySpace:
 				return
 			case termbox.KeyArrowDown:
 				dispatch("down", &Message{data: "push left"})
@@ -172,17 +174,17 @@ func drawOver() {
 	gameOver := "Game Over"
 	gameOverLen := len(gameOver)
 
-	lastMessage := "If you quit it, please press ESC"
+	lastMessage := "If you quit it, please press ESC or SPACE"
 
-	top := GAME_HEIGHT / 2
-	width := (GAME_WIDTH - gameOverLen) / 2
+	top := game_height / 2
+	width := (game_width - gameOverLen) / 2
 	color := termbox.ColorRed
 
 	fill(0, top, width, 1, termbox.Cell{Ch: '='}, color)
 	drawMessage(width, top, gameOver, color)
 	fill(width+gameOverLen, top, width, 1, termbox.Cell{Ch: '='}, color)
 
-	drawMessage((GAME_WIDTH-len(lastMessage))/2, top+1, lastMessage, color)
+	drawMessage((game_width-len(lastMessage))/2, top+1, lastMessage, color)
 }
 
 func drawScore(score int) {
@@ -191,17 +193,17 @@ func drawScore(score int) {
 
 func drawHighScore(score int) {
 	highScoreMsg := fmt.Sprintf("High Score: %d", score)
-	drawLine(GAME_WIDTH-len(highScoreMsg), 0, highScoreMsg)
+	drawLine(game_width-len(highScoreMsg), 0, highScoreMsg)
 }
 
 func drawCellNumber(grid *Grid) {
-	cellWidth := GAME_WIDTH / grid.size
-	cellHeight := GAME_HEIGHT / grid.size
+	cellWidth := game_width / grid.size
+	cellHeight := game_height / grid.size
 
 	for ly := 0; ly < grid.size; ly++ {
 		for lx := 0; lx < grid.size; lx++ {
 			tile := grid.cells[lx][ly]
-			drawSell(tile, lx*cellWidth, GAME_TOP_OFFSET+ly*cellHeight, cellWidth, cellHeight)
+			drawCell(tile, lx*cellWidth, GAME_TOP_OFFSET+ly*cellHeight, cellWidth, cellHeight)
 		}
 	}
 
@@ -289,7 +291,18 @@ func (g *GameInfo) getTiles() [][]Tile {
 }
 
 func getDirPath() string {
-	return filepath.Join(os.Getenv("HOME"), ".config", "2048")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		
+		exe, err := os.Executable()
+		
+		if err != nil {
+			panic("Couldn't find user's home directory or the executable")
+		}
+		
+		home = filepath.Dir(exe)
+	}
+	return filepath.Join(home, ".config", "2048")
 }
 
 func getFilePath() string {
@@ -334,17 +347,26 @@ func controlFromCommand() error {
 
 var (
 	debugRun bool
+	rowLength int
+	tileSize int
+	game_width int
+	game_height int
 )
 
 func main() {
 	flag.BoolVar(&debugRun, "debug", false, "debugRun flag")
+	flag.IntVar(&rowLength, "rowLength", 4, "set the number of tiles per row")
+	flag.IntVar(&tileSize, "tileSize", 8, "set the size of the square tiles")
 	flag.Parse()
-
+	
+	game_width = tileSize * 10
+	game_height = game_width / 2
+	
 	var gInfo GameInfo
 	err := gInfo.load()
 
 	drawer := Drawer{}
-	gameState := Game{gridSize: 4, drawer: &drawer}
+	gameState := Game{gridSize: rowLength, drawer: &drawer}
 	gameState.setup(gInfo)
 
 	if debugRun {
